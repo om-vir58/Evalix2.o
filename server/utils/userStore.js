@@ -5,9 +5,35 @@ const crypto = require('crypto');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 
-// In-memory active session tokens map (token -> { userId, email, expiresAt })
-const activeSessions = new Map();
+// Active sessions map (token -> { userId, email, expiresAt })
+const loadSessions = () => {
+    try {
+        if (fs.existsSync(SESSIONS_FILE)) {
+            const raw = fs.readFileSync(SESSIONS_FILE, 'utf-8');
+            const arr = JSON.parse(raw);
+            return new Map(arr);
+        }
+    } catch (e) {
+        console.error('Error loading sessions:', e);
+    }
+    return new Map();
+};
+
+const saveSessions = (sessionsMap) => {
+    try {
+        if (!fs.existsSync(DATA_DIR)) {
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+        const arr = Array.from(sessionsMap.entries());
+        fs.writeFileSync(SESSIONS_FILE, JSON.stringify(arr, null, 2), 'utf-8');
+    } catch (e) {
+        console.error('Error saving sessions:', e);
+    }
+};
+
+const activeSessions = loadSessions();
 
 /**
  * Ensure data directory and users.json file exist with demo user seeded
@@ -234,6 +260,7 @@ const createSession = (user) => {
         email: user.email,
         expiresAt
     });
+    saveSessions(activeSessions);
 
     return token;
 };
@@ -248,6 +275,7 @@ const verifySession = (token) => {
 
     if (Date.now() > session.expiresAt) {
         activeSessions.delete(token);
+        saveSessions(activeSessions);
         return null;
     }
 
@@ -261,6 +289,7 @@ const verifySession = (token) => {
 const destroySession = (token) => {
     if (token) {
         activeSessions.delete(token);
+        saveSessions(activeSessions);
     }
     return true;
 };
