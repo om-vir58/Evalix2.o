@@ -1,0 +1,346 @@
+// styles/AdminDashboard.scss
+@import './designTokens.scss';
+
+.admin-dashboard-page {
+  padding-top: 1.5rem;
+
+  .alert-evalix-error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #F87171;
+    padding: 12px 16px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+  }
+
+  .alert-evalix-success {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #34D399;
+    padding: 12px 16px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+  }
+
+  .elevation-secret-card {
+    padding: 1.5rem;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    background: radial-gradient(circle at 10% 50%, rgba(245, 158, 11, 0.08) 0%, transparent 60%);
+
+    .secret-icon-box {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      background: rgba(245, 158, 11, 0.2);
+      color: #F59E0B;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    .card-heading {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .card-sub {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .secret-input {
+      width: 220px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #FFFFFF;
+      font-size: 0.85rem;
+
+      &:focus {
+        outline: none;
+        border-color: #F59E0B;
+        box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+      }
+    }
+  }
+
+  .admin-tabs-bar {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+
+    .admin-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      transition: all 0.2s ease;
+
+      &:hover {
+        color: #FFFFFF;
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      &.active {
+        background: rgba(124, 58, 237, 0.25);
+        color: #C084FC;
+        border: 1px solid rgba(124, 58, 237, 0.4);
+      }
+    }
+  }
+
+  .admin-content-card {
+    padding: 1.75rem;
+
+    .card-header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .section-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #FFFFFF;
+      }
+
+      .badge-role-info {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        strong {
+          color: #38BDF8;
+          text-transform: uppercase;
+        }
+      }
+    }
+  }
+
+  /* Table styling */
+  .evalix-admin-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+
+    th {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    td {
+      padding: 12px 14px;
+      background: rgba(15, 23, 42, 0.5);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+
+      &:first-child {
+        border-top-left-radius: 10px;
+        border-bottom-left-radius: 10px;
+        border-left: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      &:last-child {
+        border-top-right-radius: 10px;
+        border-bottom-right-radius: 10px;
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+      }
+    }
+
+    .user-table-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(124, 58, 237, 0.3);
+      color: #C084FC;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .user-name-text {
+      font-weight: 600;
+      color: #FFFFFF;
+    }
+
+    .role-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.04em;
+
+      &.role-superadmin {
+        background: rgba(245, 158, 11, 0.2);
+        color: #F59E0B;
+        border: 1px solid rgba(245, 158, 11, 0.4);
+      }
+
+      &.role-admin {
+        background: rgba(124, 58, 237, 0.2);
+        color: #C084FC;
+        border: 1px solid rgba(124, 58, 237, 0.4);
+      }
+
+      &.role-user {
+        background: rgba(100, 116, 139, 0.2);
+        color: #94A3B8;
+        border: 1px solid rgba(100, 116, 139, 0.4);
+      }
+    }
+
+    .role-select {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #FFFFFF;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+    }
+
+    .btn-icon-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #F87171;
+      padding: 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: rgba(239, 68, 68, 0.3);
+      }
+    }
+  }
+
+  /* Feedback card grid */
+  .feedbacks-list-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    .feedback-card {
+      padding: 1.25rem;
+
+      .feedback-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+
+        .rating-stars-badge {
+          background: rgba(245, 158, 11, 0.15);
+          color: #F59E0B;
+          border: 1px solid rgba(245, 158, 11, 0.3);
+          font-size: 0.75rem;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .category-pill {
+          background: rgba(56, 189, 248, 0.15);
+          color: #38BDF8;
+          border: 1px solid rgba(56, 189, 248, 0.3);
+          font-size: 0.7rem;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 6px;
+        }
+
+        .status-pill {
+          font-size: 0.7rem;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 6px;
+          text-transform: uppercase;
+
+          &.status-pending {
+            background: rgba(245, 158, 11, 0.15);
+            color: #F59E0B;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+          }
+
+          &.status-reviewed {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34D399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+          }
+        }
+
+        .btn-mark-reviewed {
+          background: rgba(16, 185, 129, 0.15);
+          border: 1px solid rgba(16, 185, 129, 0.3);
+          color: #34D399;
+          font-size: 0.75rem;
+          padding: 4px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: rgba(16, 185, 129, 0.3);
+          }
+        }
+      }
+
+      .feedback-subject {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #FFFFFF;
+        margin: 0 0 6px;
+      }
+
+      .feedback-comments {
+        font-size: 0.85rem;
+        line-height: 1.5;
+        color: var(--text-secondary);
+        margin: 0 0 10px;
+      }
+
+      .feedback-meta-footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding-top: 8px;
+
+        strong {
+          color: #CBD5E1;
+        }
+
+        em {
+          color: #38BDF8;
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+[
+  {
+    "id": "fb_1793480647764_bb040632",
+    "userId": "test_user",
+    "userName": "Test User",
+    "userEmail": "test@evalix.com",
+    "rating": 4,
+    "category": "accuracy",
+    "subject": "User Feedback",
+    "comments": "Test comment",
+    "documentName": null,
+    "status": "pending",
+    "createdAt": "2026-10-31T21:04:07.765Z"
+  },
+  {
+    "id": "fb_seed_01",
+    "userId": "user_demo_01",
+    "userName": "Demo Researcher",
+    "userEmail": "demo@evalix.com",
+    "rating": 5,
+    "category": "accuracy",
+    "subject": "Excellent Bloom's Taxonomy mapping",
+    "comments": "The cosine similarity accurately classified complex research action verbs.",
+    "documentName": "Sample_Research_Paper.pdf",
+    "status": "reviewed",
+    "createdAt": "2026-10-31T21:04:07.763Z"
+  }
+]

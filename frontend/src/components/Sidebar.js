@@ -9,13 +9,18 @@ import {
     FiBookOpen,
     FiAward,
     FiUsers,
+    FiShield,
+    FiMessageSquare,
     FiX
 } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
 import '../styles/Sidebar.scss';
 
-const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
+const Sidebar = ({ isMobileOpen, setIsMobileOpen, onOpenFeedback }) => {
+    const { user } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
+    const isAdmin = user?.systemRole === 'admin' || user?.systemRole === 'superadmin';
 
     const handleTaxonomyClick = (domain) => {
         navigate(`/classifications?domain=${domain.toLowerCase()}`);
@@ -125,6 +130,35 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
                             </span>
                             <span className="item-label">Credits</span>
                         </NavLink>
+
+                        {isAdmin && (
+                            <NavLink 
+                                to="/admin" 
+                                className={({ isActive }) => `sidebar-nav-item ${isActive ? 'active' : ''}`}
+                                onClick={() => setIsMobileOpen && setIsMobileOpen(false)}
+                                style={{ borderLeft: '3px solid #F59E0B' }}
+                            >
+                                <span className="item-icon-wrap">
+                                    <FiShield className="nav-icon" style={{ color: '#F59E0B' }} />
+                                </span>
+                                <span className="item-label" style={{ color: '#F59E0B' }}>Admin Control</span>
+                            </NavLink>
+                        )}
+
+                        <button 
+                            type="button"
+                            className="sidebar-nav-item feedback-sidebar-btn"
+                            onClick={() => {
+                                if (onOpenFeedback) onOpenFeedback();
+                                if (setIsMobileOpen) setIsMobileOpen(false);
+                            }}
+                            style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                        >
+                            <span className="item-icon-wrap">
+                                <FiMessageSquare className="nav-icon" style={{ color: '#38BDF8' }} />
+                            </span>
+                            <span className="item-label">Feedback</span>
+                        </button>
                     </nav>
                 </div>
 

@@ -21,7 +21,7 @@ const extractToken = (req) => {
 // ============================================================================
 const handleSignup = (req, res) => {
     try {
-        const { email, password, name, role } = req.body;
+        const { email, password, name, role, adminSecret } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({
@@ -57,7 +57,8 @@ const handleSignup = (req, res) => {
             email,
             password,
             name,
-            role
+            role,
+            adminSecret
         });
 
         const token = userStore.createSession(newUser);

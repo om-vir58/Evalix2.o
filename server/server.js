@@ -4,6 +4,8 @@ const dotenv = require('dotenv');
 const paperRoutes = require('./routes/paperRoutes');
 const authRoutes = require('./routes/authRoutes');
 const certificateRoutes = require('./routes/certificateRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes');
 const path = require('path');
 
 // Load environment variables
@@ -35,6 +37,8 @@ directories.forEach(dir => {
 app.use('/api/papers', paperRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/certificates', certificateRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

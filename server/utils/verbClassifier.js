@@ -103,6 +103,11 @@ const findBestMatch = async (verb, isVerified = true) => {
         }
 
         let bestMatch = { domain: 'unclassified', subdomain: 'unknown', similarity: 0, method: 'similarity', matchedWith: undefined };
+        const domainProximities = {
+            cognitive: 0,
+            affective: 0,
+            psychomotor: 0
+        };
 
         for (const [domain, subdomains] of Object.entries(taxonomy)) {
             for (const [subdomain, examples] of Object.entries(subdomains)) {
@@ -116,6 +121,10 @@ const findBestMatch = async (verb, isVerified = true) => {
                         const similarity = cosineSimilarity(verbEmbedding, exampleEmbedding);
 
                         if (isNaN(similarity)) continue;
+
+                        if (similarity > domainProximities[domain]) {
+                            domainProximities[domain] = similarity;
+                        }
 
                         if (similarity > bestMatch.similarity) {
                             bestMatch = {
@@ -133,6 +142,14 @@ const findBestMatch = async (verb, isVerified = true) => {
             }
         }
 
+        // Calculate similarity percentage (0-100%)
+        const similarityPercentage = Math.round(Math.max(0, Math.min(1, bestMatch.similarity)) * 100);
+        const domainPercentages = {
+            cognitive: Math.round(Math.max(0, Math.min(1, domainProximities.cognitive)) * 100),
+            affective: Math.round(Math.max(0, Math.min(1, domainProximities.affective)) * 100),
+            psychomotor: Math.round(Math.max(0, Math.min(1, domainProximities.psychomotor)) * 100)
+        };
+
         // Apply strictness threshold based on verification status
         const requiredThreshold = isVerified 
             ? SIMILARITY_THRESHOLD_VERIFIED 
@@ -143,22 +160,40 @@ const findBestMatch = async (verb, isVerified = true) => {
                 domain: bestMatch.domain,
                 subdomain: bestMatch.subdomain,
                 similarity: bestMatch.similarity,
+                similarityPercentage,
+                domainPercentages,
                 method: isVerified ? 'similarity' : 'similarity (unverified inference)',
-                matchedWith: bestMatch.matchedWith
+                matchedWith: bestMatch.matchedWith,
+                suggestedDomain: bestMatch.domain,
+                suggestedSubdomain: bestMatch.subdomain
             };
         } else {
-            // Below threshold: mark unclassified
+            // Below threshold: mark unclassified but retain suggested domain match & percentages
             return {
                 domain: 'unclassified',
                 subdomain: 'unknown',
                 similarity: bestMatch.similarity,
+                similarityPercentage,
+                domainPercentages,
                 method: isVerified ? 'below threshold' : 'below threshold (unverified)',
-                matchedWith: bestMatch.matchedWith
+                matchedWith: bestMatch.matchedWith,
+                suggestedDomain: bestMatch.domain,
+                suggestedSubdomain: bestMatch.subdomain
             };
         }
     } catch (error) {
         console.error(`Error in findBestMatch for "${normalizedVerb}":`, error);
-        return { domain: 'unclassified', subdomain: 'unknown', similarity: 0, method: 'error', matchedWith: undefined };
+        return { 
+            domain: 'unclassified', 
+            subdomain: 'unknown', 
+            similarity: 0, 
+            similarityPercentage: 0,
+            domainPercentages: { cognitive: 0, affective: 0, psychomotor: 0 },
+            method: 'error', 
+            matchedWith: undefined,
+            suggestedDomain: 'unclassified',
+            suggestedSubdomain: 'unknown'
+        };
     }
 };
 
@@ -212,6 +247,10 @@ exports.classifyVerbs = async (verbsWithFrequency) => {
             frequency: frequency,
             verified: isVerified,
             similarityScore: classification.similarity,
+            similarityPercentage: classification.similarityPercentage ?? Math.round((classification.similarity || 0) * 100),
+            domainPercentages: classification.domainPercentages || { cognitive: 0, affective: 0, psychomotor: 0 },
+            suggestedDomain: classification.suggestedDomain || classification.domain,
+            suggestedSubdomain: classification.suggestedSubdomain || classification.subdomain,
             domain: classification.domain,
             subdomain: classification.subdomain,
             matchedWith: classification.matchedWith,
@@ -219,6 +258,10 @@ exports.classifyVerbs = async (verbsWithFrequency) => {
                 domain: classification.domain,
                 subdomain: classification.subdomain,
                 confidence: classification.similarity,
+                similarityPercentage: classification.similarityPercentage ?? Math.round((classification.similarity || 0) * 100),
+                domainPercentages: classification.domainPercentages || { cognitive: 0, affective: 0, psychomotor: 0 },
+                suggestedDomain: classification.suggestedDomain || classification.domain,
+                suggestedSubdomain: classification.suggestedSubdomain || classification.subdomain,
                 matchedWith: classification.matchedWith,
                 verified: isVerified
             }

@@ -23,6 +23,8 @@ import AboutAnalysisPage from './components/AboutAnalysisPage';
 import QualityCheckPanel from './components/QualityCheckPanel';
 import CertificateView from './components/CertificateView';
 import CreditsPage from './components/CreditsPage';
+import AdminDashboard from './components/AdminDashboard';
+import FeedbackModal from './components/FeedbackModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 
@@ -386,6 +388,8 @@ function DashboardLayout({
     isMobileSidebarOpen,
     setIsMobileSidebarOpen
 }) {
+    const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
     return (
         <div className="evalix-app-root evalix-grid-bg">
 
@@ -411,6 +415,7 @@ function DashboardLayout({
                 <Sidebar
                     isMobileOpen={isMobileSidebarOpen}
                     setIsMobileOpen={setIsMobileSidebarOpen}
+                    onOpenFeedback={() => setIsFeedbackOpen(true)}
                 />
 
                 {isMobileSidebarOpen && (
@@ -419,6 +424,12 @@ function DashboardLayout({
                         onClick={() => setIsMobileSidebarOpen(false)}
                     ></div>
                 )}
+
+                <FeedbackModal 
+                    isOpen={isFeedbackOpen} 
+                    onClose={() => setIsFeedbackOpen(false)}
+                    currentDocument={analysisData?.documentInfo}
+                />
 
                 <main className="evalix-content-area">
 
@@ -521,6 +532,13 @@ function DashboardLayout({
                             path="/credits"
                             element={
                                 <CreditsPage />
+                            }
+                        />
+
+                        <Route
+                            path="/admin"
+                            element={
+                                <AdminDashboard />
                             }
                         />
 

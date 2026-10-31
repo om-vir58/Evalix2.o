@@ -246,4 +246,90 @@ export const fetchCertificatesHistoryApi = async () => {
     }
 };
 
+/**
+ * Feedback APIs
+ */
+export const submitFeedbackApi = async (feedbackData) => {
+    try {
+        const response = await api.post('/feedback', feedbackData);
+        return response.data;
+    } catch (error) {
+        console.error('Error submitting feedback:', error);
+        throw error;
+    }
+};
+
+export const fetchAllFeedbackApi = async () => {
+    try {
+        const response = await api.get('/feedback');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching feedback:', error);
+        throw error;
+    }
+};
+
+export const updateFeedbackStatusApi = async (id, status) => {
+    try {
+        const response = await api.patch(`/feedback/${id}/status`, { status });
+        return response.data;
+    } catch (error) {
+        console.error('Error updating feedback status:', error);
+        throw error;
+    }
+};
+
+export const deleteFeedbackApi = async (id) => {
+    try {
+        const response = await api.delete(`/feedback/${id}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error deleting feedback:', error);
+        throw error;
+    }
+};
+
+/**
+ * Admin APIs
+ */
+export const fetchAdminUsersApi = async () => {
+    try {
+        const response = await api.get('/admin/users');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+    }
+};
+
+export const updateUserRoleApi = async (userId, systemRole) => {
+    try {
+        const response = await api.patch(`/admin/users/${userId}/role`, { systemRole });
+        return response.data;
+    } catch (error) {
+        console.error('Error updating user role:', error);
+        throw error;
+    }
+};
+
+export const deleteUserApi = async (userId) => {
+    try {
+        const response = await api.delete(`/admin/users/${userId}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        throw error;
+    }
+};
+
+export const promoteWithSecretApi = async (secretKey) => {
+    try {
+        const response = await api.post('/admin/promote-with-secret', { secretKey });
+        return response.data;
+    } catch (error) {
+        console.error('Error promoting with secret key:', error);
+        throw error;
+    }
+};
+
 export default api;

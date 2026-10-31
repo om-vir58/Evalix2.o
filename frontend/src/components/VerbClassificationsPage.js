@@ -249,6 +249,14 @@ const VerbClassificationsPage = ({ data, onLoadSample }) => {
                         <span className="dot dot-psychomotor"></span>
                         Psychomotor ({data.domains?.psychomotor?.count || 0})
                     </button>
+                    <button
+                        type="button"
+                        className={`filter-pill pill-unclassified ${activeDomain === 'unclassified' ? 'active' : ''}`}
+                        onClick={() => handleDomainChange('unclassified')}
+                    >
+                        <span className="dot" style={{ background: '#94A3B8' }}></span>
+                        Unknown / Unclassified ({data.domains?.unclassified?.count || 0})
+                    </button>
                 </div>
 
                 {/* Search Input */}
@@ -337,13 +345,32 @@ const VerbClassificationsPage = ({ data, onLoadSample }) => {
                                     const domain = item.classification?.domain?.toLowerCase() || 'unclassified';
                                     const domainColor = DOMAIN_COLORS[domain] || '#64748B';
                                     const confidenceVal = item.classification?.confidence || 0;
-                                    const confidencePercent = Math.round(confidenceVal * 100);
+                                    const confidencePercent = item.classification?.similarityPercentage ?? Math.round(confidenceVal * 100);
+                                    const isUnknown = domain === 'unclassified' || domain === 'unknown';
+                                    const suggestedDomain = item.classification?.suggestedDomain || item.suggestedDomain;
+                                    const suggestedSubdomain = item.classification?.suggestedSubdomain || item.suggestedSubdomain;
+                                    const domainPcts = item.classification?.domainPercentages || item.domainPercentages;
 
                                     return (
                                         <tr key={idx} className="table-data-row">
                                             <td className="verb-name-cell">
                                                 <div className="d-flex align-items-center gap-2 flex-wrap">
                                                     <span className="verb-main-text">{item.verb}</span>
+                                                    {isUnknown && (
+                                                        <span 
+                                                            className="badge"
+                                                            title="Below strict classification threshold - nearest match computed via vector cosine similarity"
+                                                            style={{
+                                                                fontSize: '0.65rem',
+                                                                background: 'rgba(148, 163, 184, 0.15)',
+                                                                border: '1px solid rgba(148, 163, 184, 0.4)',
+                                                                color: '#94A3B8',
+                                                                padding: '0.15rem 0.45rem'
+                                                            }}
+                                                        >
+                                                            Unknown ({confidencePercent}%)
+                                                        </span>
+                                                    )}
                                                     {(item.verified === false || item.classification?.verified === false) && (
                                                         <span 
                                                             className="unverified-inferred-badge"
@@ -367,7 +394,7 @@ const VerbClassificationsPage = ({ data, onLoadSample }) => {
                                                 </div>
                                                 {item.classification?.matchedWith && (
                                                     <span className="matched-with-sub">
-                                                        matched with: <em>{item.classification.matchedWith}</em>
+                                                        {isUnknown ? 'closest benchmark:' : 'matched with:'} <em>{item.classification.matchedWith}</em>
                                                     </span>
                                                 )}
                                             </td>
@@ -379,26 +406,55 @@ const VerbClassificationsPage = ({ data, onLoadSample }) => {
                                             </td>
 
                                             <td>
-                                                <span 
-                                                    className="domain-table-badge"
-                                                    style={{
-                                                        backgroundColor: `${domainColor}1A`,
-                                                        borderColor: `${domainColor}4D`,
-                                                        color: domainColor
-                                                    }}
-                                                >
+                                                {isUnknown ? (
+                                                    <div>
+                                                        <span 
+                                                            className="domain-table-badge"
+                                                            style={{
+                                                                backgroundColor: 'rgba(100, 116, 139, 0.15)',
+                                                                borderColor: 'rgba(100, 116, 139, 0.35)',
+                                                                color: '#94A3B8'
+                                                            }}
+                                                        >
+                                                            <span className="badge-dot" style={{ backgroundColor: '#94A3B8' }}></span>
+                                                            Unclassified
+                                                        </span>
+                                                        {suggestedDomain && suggestedDomain !== 'unclassified' && (
+                                                            <div className="mt-1" style={{ fontSize: '0.72rem', color: '#CBD5E1' }}>
+                                                                Closest: <strong style={{ color: DOMAIN_COLORS[suggestedDomain.toLowerCase()] || '#C084FC' }}>
+                                                                    {suggestedDomain.charAt(0).toUpperCase() + suggestedDomain.slice(1)} ({confidencePercent}%)
+                                                                </strong>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
                                                     <span 
-                                                        className="badge-dot" 
-                                                        style={{ backgroundColor: domainColor }}
-                                                    ></span>
-                                                    {domain.charAt(0).toUpperCase() + domain.slice(1)}
-                                                </span>
+                                                        className="domain-table-badge"
+                                                        style={{
+                                                            backgroundColor: `${domainColor}1A`,
+                                                            borderColor: `${domainColor}4D`,
+                                                            color: domainColor
+                                                        }}
+                                                    >
+                                                        <span 
+                                                            className="badge-dot" 
+                                                            style={{ backgroundColor: domainColor }}
+                                                        ></span>
+                                                        {domain.charAt(0).toUpperCase() + domain.slice(1)}
+                                                    </span>
+                                                )}
                                             </td>
 
                                             <td>
                                                 <span className="subdomain-text">
-                                                    {(item.classification?.subdomain || 'Unknown').charAt(0).toUpperCase() + 
-                                                     (item.classification?.subdomain || 'unknown').slice(1)}
+                                                    {isUnknown && suggestedSubdomain && suggestedSubdomain !== 'unknown' ? (
+                                                        <span title="Suggested nearest subdomain based on embedding similarity">
+                                                            ~ {suggestedSubdomain.charAt(0).toUpperCase() + suggestedSubdomain.slice(1)} <small style={{ color: '#64748B' }}>(suggested)</small>
+                                                        </span>
+                                                    ) : (
+                                                        (item.classification?.subdomain || 'Unknown').charAt(0).toUpperCase() + 
+                                                        (item.classification?.subdomain || 'unknown').slice(1)
+                                                    )}
                                                 </span>
                                             </td>
 
@@ -420,6 +476,13 @@ const VerbClassificationsPage = ({ data, onLoadSample }) => {
                                                         {confidencePercent}%
                                                     </span>
                                                 </div>
+                                                {domainPcts && isUnknown && (
+                                                    <div className="d-flex gap-2 mt-1" style={{ fontSize: '0.65rem', color: '#94A3B8' }}>
+                                                        <span>Cog: <span style={{ color: DOMAIN_COLORS.cognitive }}>{domainPcts.cognitive}%</span></span>
+                                                        <span>Aff: <span style={{ color: DOMAIN_COLORS.affective }}>{domainPcts.affective}%</span></span>
+                                                        <span>Psy: <span style={{ color: DOMAIN_COLORS.psychomotor }}>{domainPcts.psychomotor}%</span></span>
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     );

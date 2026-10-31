@@ -133,7 +133,24 @@ const Header = () => {
                                 <div className="dropdown-user-info">
                                     <div className="info-name">{displayName}</div>
                                     <div className="info-email">{userEmail}</div>
-                                    <div className="info-role">{userRole}</div>
+                                    <div className="d-flex align-items-center gap-2 mt-1">
+                                        <div className="info-role">{userRole}</div>
+                                        {user?.systemRole && (
+                                            <span 
+                                                className="badge" 
+                                                style={{
+                                                    fontSize: '0.65rem',
+                                                    background: user.systemRole === 'superadmin' ? 'rgba(245, 158, 11, 0.2)' : user.systemRole === 'admin' ? 'rgba(124, 58, 237, 0.2)' : 'rgba(100, 116, 139, 0.2)',
+                                                    color: user.systemRole === 'superadmin' ? '#F59E0B' : user.systemRole === 'admin' ? '#C084FC' : '#94A3B8',
+                                                    border: '1px solid currentColor',
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px'
+                                                }}
+                                            >
+                                                {user.systemRole === 'superadmin' ? '👑 SUPERADMIN' : user.systemRole.toUpperCase()}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="dropdown-divider"></div>
                                 <Link to="/upload" className="dropdown-link" onClick={() => setUserMenuOpen(false)}>
@@ -145,6 +162,11 @@ const Header = () => {
                                 <Link to="/about" className="dropdown-link" onClick={() => setUserMenuOpen(false)}>
                                     About Analysis
                                 </Link>
+                                {(user?.systemRole === 'admin' || user?.systemRole === 'superadmin') && (
+                                    <Link to="/admin" className="dropdown-link" onClick={() => setUserMenuOpen(false)} style={{ color: '#F59E0B' }}>
+                                        Admin Governance
+                                    </Link>
+                                )}
                                 <div className="dropdown-divider"></div>
                                 <button
                                     type="button"
