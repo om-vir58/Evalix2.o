@@ -2,6 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const userStore = require('../utils/userStore');
+const captchaService = require('../utils/captchaService');
+const emailService = require('../utils/emailService');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -17,12 +19,50 @@ const extractToken = (req) => {
 };
 
 // ============================================================================
-// POST /api/auth/signup - Register new user
+// GET /api/auth/captcha - Generate fresh visual CAPTCHA
 // ============================================================================
-const handleSignup = (req, res) => {
+router.get('/captcha', (req, res) => {
     try {
-        const { email, password, name, role } = req.body;
+        const captcha = captchaService.createCaptcha(5);
+        return res.status(200).json({
+            success: true,
+            captchaId: captcha.captchaId,
+            svg: captcha.svg,
+            expiresIn: captcha.expiresIn
+        });
+    } catch (err) {
+        console.error('Captcha generation error:', err.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to generate CAPTCHA challenge.'
+        });
+    }
+});
 
+// ============================================================================
+// POST /api/auth/signup - Register new user with CAPTCHA and email verification
+// ============================================================================
+const handleSignup = async (req, res) => {
+    try {
+        const { email, password, name, role, captchaId, captchaInput } = req.body;
+
+        // 1. Validate CAPTCHA
+        if (!captchaId || !captchaInput) {
+            return res.status(400).json({
+                success: false,
+                message: 'Security CAPTCHA verification is required.'
+            });
+        }
+
+        const isCaptchaValid = captchaService.verifyCaptcha(captchaId, captchaInput);
+        if (!isCaptchaValid) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid or expired CAPTCHA. Please enter the new characters displayed.'
+            });
+        }
+
+        // 2. Validate input fields
         if (!email || !password) {
             return res.status(400).json({
                 success: false,
@@ -44,7 +84,7 @@ const handleSignup = (req, res) => {
             });
         }
 
-        // Check if user already exists
+        // 3. Check if user already exists
         const existing = userStore.findUserByEmail(email);
         if (existing) {
             return res.status(409).json({
@@ -53,20 +93,27 @@ const handleSignup = (req, res) => {
             });
         }
 
-        const newUser = userStore.createUser({
+        // 4. Create unverified user and send 6-digit verification email
+        const { user: newUser, verificationCode } = userStore.createUser({
             email,
             password,
             name,
             role
         });
 
-        const token = userStore.createSession(newUser);
+        const emailResult = await emailService.sendVerificationEmail(
+            newUser.email,
+            newUser.name,
+            verificationCode
+        );
 
         return res.status(201).json({
             success: true,
-            message: 'Account created successfully.',
+            requiresEmailVerification: true,
+            email: newUser.email,
+            message: 'Account created! Please verify your email with the 6-digit code sent to your inbox.',
             user: newUser,
-            token
+            devCode: emailResult.previewCode || null
         });
     } catch (err) {
         console.error('Signup error:', err.message);
@@ -81,12 +128,121 @@ router.post('/signup', handleSignup);
 router.post('/register', handleSignup);
 
 // ============================================================================
-// POST /api/auth/login - Authenticate user
+// POST /api/auth/verify-email - Verify 6-digit email confirmation code
 // ============================================================================
-router.post('/login', (req, res) => {
+router.post('/verify-email', (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, code } = req.body;
 
+        if (!email || !code) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email address and 6-digit verification code are required.'
+            });
+        }
+
+        const verificationResult = userStore.verifyEmailCode(email, code);
+
+        if (!verificationResult.success) {
+            return res.status(400).json({
+                success: false,
+                message: verificationResult.message
+            });
+        }
+
+        // Generate active session on successful verification
+        const token = userStore.createSession(verificationResult.user);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Email verified successfully! Welcome to Evalix 2.0.',
+            user: verificationResult.user,
+            token
+        });
+    } catch (err) {
+        console.error('Email verification error:', err.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error during email verification.'
+        });
+    }
+});
+
+// ============================================================================
+// POST /api/auth/resend-verification - Resend 6-digit verification code
+// ============================================================================
+router.post('/resend-verification', async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email address is required.'
+            });
+        }
+
+        const user = userStore.findUserByEmail(email);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'No account found with this email address.'
+            });
+        }
+
+        if (user.isEmailVerified) {
+            return res.status(200).json({
+                success: true,
+                alreadyVerified: true,
+                message: 'This email is already verified. You can sign in immediately.'
+            });
+        }
+
+        const updated = userStore.setVerificationCode(email);
+        const emailResult = await emailService.sendVerificationEmail(
+            user.email,
+            user.name,
+            updated.code
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: 'A new 6-digit verification code has been dispatched to your email.',
+            devCode: emailResult.previewCode || null
+        });
+    } catch (err) {
+        console.error('Resend verification error:', err.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to resend verification email.'
+        });
+    }
+});
+
+// ============================================================================
+// POST /api/auth/login - Authenticate user with CAPTCHA & Email Verification
+// ============================================================================
+router.post('/login', async (req, res) => {
+    try {
+        const { email, password, captchaId, captchaInput } = req.body;
+
+        // 1. Validate CAPTCHA
+        if (!captchaId || !captchaInput) {
+            return res.status(400).json({
+                success: false,
+                message: 'Security CAPTCHA verification is required.'
+            });
+        }
+
+        const isCaptchaValid = captchaService.verifyCaptcha(captchaId, captchaInput);
+        if (!isCaptchaValid) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid or expired CAPTCHA. Please enter the new characters displayed.'
+            });
+        }
+
+        // 2. Validate credentials
         if (!email || !password) {
             return res.status(400).json({
                 success: false,
@@ -100,6 +256,25 @@ router.post('/login', (req, res) => {
             return res.status(401).json({
                 success: false,
                 message: 'Invalid email or password.'
+            });
+        }
+
+        // 3. Check if email is verified
+        if (user.isEmailVerified === false) {
+            // Automatically refresh verification code and dispatch email
+            const updated = userStore.setVerificationCode(user.email);
+            const emailResult = await emailService.sendVerificationEmail(
+                user.email,
+                user.name,
+                updated.code
+            );
+
+            return res.status(403).json({
+                success: false,
+                requiresEmailVerification: true,
+                email: user.email,
+                message: 'Your email address is not yet verified. A fresh 6-digit verification code has been sent.',
+                devCode: emailResult.previewCode || null
             });
         }
 

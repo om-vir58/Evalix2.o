@@ -29,6 +29,7 @@ const ensureStore = () => {
                 role: 'Senior NLP Researcher',
                 salt: demoSalt,
                 passwordHash: demoHash,
+                isEmailVerified: true,
                 createdAt: new Date().toISOString()
             }
         ];
@@ -45,13 +46,24 @@ const hashPassword = (password, salt) => {
 };
 
 /**
- * Read all users from disk
+ * Generate a 6-digit verification numeric code
+ */
+const generateVerificationCode = () => {
+    return crypto.randomInt(100000, 999999).toString();
+};
+
+/**
+ * Read all users from disk, ensuring legacy users have isEmailVerified default to true
  */
 const getAllUsers = () => {
     ensureStore();
     try {
         const raw = fs.readFileSync(USERS_FILE, 'utf-8');
-        return JSON.parse(raw);
+        const users = JSON.parse(raw);
+        return users.map(user => ({
+            ...user,
+            isEmailVerified: user.isEmailVerified !== undefined ? user.isEmailVerified : true
+        }));
     } catch (err) {
         console.error('Error reading users store:', err);
         return [];
@@ -94,9 +106,9 @@ const verifyPassword = (user, password) => {
 };
 
 /**
- * Create and register a new user
+ * Create and register a new user (unverified by default)
  */
-const createUser = ({ email, password, name, role }) => {
+const createUser = ({ email, password, name, role, verificationCode }) => {
     const users = getAllUsers();
     const cleanEmail = email.trim().toLowerCase();
 
@@ -106,6 +118,8 @@ const createUser = ({ email, password, name, role }) => {
 
     const salt = crypto.randomBytes(16).toString('hex');
     const passwordHash = hashPassword(password, salt);
+    const code = verificationCode || generateVerificationCode();
+    const verificationExpiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
 
     const newUser = {
         id: `user_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
@@ -114,13 +128,89 @@ const createUser = ({ email, password, name, role }) => {
         role: role ? role.trim() : 'Researcher / Analyst',
         salt,
         passwordHash,
+        isEmailVerified: false,
+        verificationCode: code,
+        verificationExpiresAt,
         createdAt: new Date().toISOString()
     };
 
     users.push(newUser);
     saveUsers(users);
 
-    return sanitizeUser(newUser);
+    return {
+        user: sanitizeUser(newUser),
+        verificationCode: code
+    };
+};
+
+/**
+ * Set a new verification code for an existing user (e.g. resend)
+ */
+const setVerificationCode = (email, customCode = null, expiryMinutes = 15) => {
+    const users = getAllUsers();
+    const cleanEmail = email.trim().toLowerCase();
+    const idx = users.findIndex(u => u.email.toLowerCase() === cleanEmail);
+
+    if (idx === -1) {
+        return null;
+    }
+
+    const code = customCode || generateVerificationCode();
+    const verificationExpiresAt = Date.now() + expiryMinutes * 60 * 1000;
+
+    users[idx].verificationCode = code;
+    users[idx].verificationExpiresAt = verificationExpiresAt;
+
+    saveUsers(users);
+    return { user: sanitizeUser(users[idx]), code };
+};
+
+/**
+ * Verify an email code
+ */
+const verifyEmailCode = (email, inputCode) => {
+    const users = getAllUsers();
+    const cleanEmail = email.trim().toLowerCase();
+    const idx = users.findIndex(u => u.email.toLowerCase() === cleanEmail);
+
+    if (idx === -1) {
+        return { success: false, message: 'User not found.' };
+    }
+
+    const user = users[idx];
+
+    if (user.isEmailVerified) {
+        return {
+            success: true,
+            message: 'Email is already verified.',
+            user: sanitizeUser(user)
+        };
+    }
+
+    if (!user.verificationCode || !inputCode) {
+        return { success: false, message: 'Invalid or missing verification code.' };
+    }
+
+    if (Date.now() > (user.verificationExpiresAt || 0)) {
+        return { success: false, message: 'Verification code has expired. Please request a new one.' };
+    }
+
+    if (user.verificationCode.toString().trim() !== inputCode.toString().trim()) {
+        return { success: false, message: 'Incorrect verification code. Please check and try again.' };
+    }
+
+    // Mark as verified
+    users[idx].isEmailVerified = true;
+    users[idx].verificationCode = null;
+    users[idx].verificationExpiresAt = null;
+
+    saveUsers(users);
+
+    return {
+        success: true,
+        message: 'Email successfully verified!',
+        user: sanitizeUser(users[idx])
+    };
 };
 
 /**
@@ -128,7 +218,7 @@ const createUser = ({ email, password, name, role }) => {
  */
 const sanitizeUser = (user) => {
     if (!user) return null;
-    const { salt, passwordHash, ...safeUser } = user;
+    const { salt, passwordHash, verificationCode, verificationExpiresAt, ...safeUser } = user;
     return safeUser;
 };
 
@@ -181,6 +271,9 @@ module.exports = {
     findUserById,
     verifyPassword,
     createUser,
+    setVerificationCode,
+    verifyEmailCode,
+    generateVerificationCode,
     sanitizeUser,
     createSession,
     verifySession,

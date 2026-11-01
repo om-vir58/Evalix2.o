@@ -20,15 +20,41 @@ api.interceptors.request.use((config) => {
 }, (error) => Promise.reject(error));
 
 /**
- * Authentication API calls
+ * Authentication API calls with CAPTCHA and Email Verification
  */
-export const loginUser = async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
+export const fetchCaptchaApi = async () => {
+    const response = await api.get('/auth/captcha');
     return response.data;
 };
 
-export const signupUser = async (email, password, name) => {
-    const response = await api.post('/auth/signup', { email, password, name });
+export const loginUser = async (email, password, captchaId, captchaInput) => {
+    const response = await api.post('/auth/login', { 
+        email, 
+        password, 
+        captchaId, 
+        captchaInput 
+    });
+    return response.data;
+};
+
+export const signupUser = async (email, password, name, captchaId, captchaInput) => {
+    const response = await api.post('/auth/signup', { 
+        email, 
+        password, 
+        name, 
+        captchaId, 
+        captchaInput 
+    });
+    return response.data;
+};
+
+export const verifyEmailApi = async (email, code) => {
+    const response = await api.post('/auth/verify-email', { email, code });
+    return response.data;
+};
+
+export const resendVerificationApi = async (email) => {
+    const response = await api.post('/auth/resend-verification', { email });
     return response.data;
 };
 
