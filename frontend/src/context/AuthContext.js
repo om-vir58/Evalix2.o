@@ -65,13 +65,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUser = (updatedUserData) => {
+    setUser(updatedUserData);
+    try {
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUserData));
+    } catch (err) {
+      console.error('Error saving updated user to localStorage:', err);
+    }
+  };
+
   const value = {
     user,
     token,
     isAuthenticated: !!user,
     isLoading,
     login,
-    logout
+    logout,
+    updateUser
   };
 
   return (

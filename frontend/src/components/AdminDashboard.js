@@ -25,7 +25,7 @@ import { useAuth } from '../context/AuthContext';
 import '../styles/AdminDashboard.scss';
 
 const AdminDashboard = () => {
-    const { user, login } = useAuth();
+    const { user, updateUser } = useAuth();
     const [activeTab, setActiveTab] = useState('users');
     const [users, setUsers] = useState([]);
     const [feedbacks, setFeedbacks] = useState([]);
@@ -117,8 +117,11 @@ const AdminDashboard = () => {
             const res = await promoteWithSecretApi(secretKeyInput.trim());
             setSuccessMessage('Secret seed key verified! Elevated to Superadmin.');
             setSecretKeyInput('');
-            // Trigger local auth reload if available
-            window.location.reload();
+            if (res.user && updateUser) {
+                updateUser(res.user);
+            }
+            // Reload users data to reflect superadmin view
+            loadData();
         } catch (err) {
             setError(err.response?.data?.message || 'Invalid secret seed key.');
         } finally {
