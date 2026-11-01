@@ -13,12 +13,21 @@ import {
   LuX,
   LuMail,
   LuLock,
-  LuUser
+  LuUser,
+  LuRefreshCw,
+  LuKey,
+  LuCheck
 } from 'react-icons/lu';
 
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { loginUser, signupUser } from '../services/api';
+import {
+  loginUser,
+  signupUser,
+  fetchCaptchaApi,
+  verifyEmailApi,
+  resendVerificationApi
+} from '../services/api';
 
 import '../styles/LandingPage.scss';
 
@@ -28,7 +37,7 @@ import '../styles/LandingPage.scss';
  * Screen 1 of the app flow:
  * - Professional, modern, and aesthetically polished static landing page
  * - Features sticky glassmorphism navbar, hero copy, live metrics mockup, and minimal footer
- * - Contains connected authentication for login, signup, and dashboard navigation
+ * - Contains connected authentication with CAPTCHA and Email Verification
  */
 const LandingPage = () => {
 
@@ -38,11 +47,27 @@ const LandingPage = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Modal state: mode can be 'login' | 'signup' | 'verify'
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login' });
 
+  // Form fields
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  // CAPTCHA state
+  const [captchaData, setCaptchaData] = useState(null);
+  const [captchaInput, setCaptchaInput] = useState('');
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+
+  // Email verification state
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [devOtpHint, setDevOtpHint] = useState(null);
+
+  // Status messages
   const [authError, setAuthError] = useState('');
   const [authSuccess, setAuthSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,16 +83,45 @@ const LandingPage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Cooldown countdown timer for resending verification code
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
+
   // Theme toggle handler
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
+  };
+
+  // Fetch a fresh CAPTCHA challenge
+  const loadCaptcha = async () => {
+    try {
+      setCaptchaLoading(true);
+      const res = await fetchCaptchaApi();
+      if (res.success) {
+        setCaptchaData(res);
+        setCaptchaInput('');
+      }
+    } catch (err) {
+      console.error('Error fetching captcha:', err);
+    } finally {
+      setCaptchaLoading(false);
+    }
   };
 
   // Open authentication modal
   const openAuth = (mode = 'login') => {
     setAuthError('');
     setAuthSuccess('');
+    setCaptchaInput('');
     setAuthModal({ isOpen: true, mode });
+    if (mode === 'login' || mode === 'signup') {
+      loadCaptcha();
+    }
   };
 
   const closeAuth = () => {
@@ -76,16 +130,37 @@ const LandingPage = () => {
     setAuthModal({ ...authModal, isOpen: false });
   };
 
-  // Authentication and dashboard navigation
+  // Handle Login & Signup submission
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
     setAuthSuccess('');
+
+    if (!captchaInput.trim()) {
+      setAuthError('Please enter the security CAPTCHA characters.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       if (authModal.mode === 'login') {
-        const data = await loginUser(email, password);
+        const data = await loginUser(
+          email,
+          password,
+          captchaData?.captchaId,
+          captchaInput.trim()
+        );
+
+        if (data.requiresEmailVerification) {
+          setVerificationEmail(data.email || email);
+          if (data.devCode) setDevOtpHint(data.devCode);
+          setAuthModal({ isOpen: true, mode: 'verify' });
+          setAuthSuccess(data.message || 'Please verify your email before logging in.');
+          setResendCooldown(30);
+          return;
+        }
+
         if (data.success) {
           setAuthUser(data.user, data.token);
           setAuthSuccess('Login successful! Entering dashboard...');
@@ -95,9 +170,26 @@ const LandingPage = () => {
           }, 400);
         } else {
           setAuthError(data.message || 'Invalid email or password.');
+          loadCaptcha();
         }
-      } else {
-        const data = await signupUser(email, password, fullName);
+      } else if (authModal.mode === 'signup') {
+        const data = await signupUser(
+          email,
+          password,
+          fullName,
+          captchaData?.captchaId,
+          captchaInput.trim()
+        );
+
+        if (data.requiresEmailVerification) {
+          setVerificationEmail(data.email || email);
+          if (data.devCode) setDevOtpHint(data.devCode);
+          setAuthModal({ isOpen: true, mode: 'verify' });
+          setAuthSuccess(data.message || 'Account created! Enter the 6-digit verification code sent to your email.');
+          setResendCooldown(30);
+          return;
+        }
+
         if (data.success) {
           setAuthUser(data.user, data.token);
           setAuthSuccess('Account created! Entering dashboard...');
@@ -107,14 +199,69 @@ const LandingPage = () => {
           }, 400);
         } else {
           setAuthError(data.message || 'Unable to create account.');
+          loadCaptcha();
         }
       }
     } catch (error) {
       console.error('Authentication error:', error);
-      const serverMsg = error.response?.data?.message || 'Unable to connect to the server. Make sure the backend is running on port 5001.';
+      const serverMsg = error.response?.data?.message || 'Unable to connect to the server. Please check backend connection.';
+      setAuthError(serverMsg);
+      loadCaptcha();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Email Verification Code submission
+  const handleVerifySubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSuccess('');
+
+    const cleanCode = verificationCode.trim();
+    if (cleanCode.length !== 6) {
+      setAuthError('Please enter the complete 6-digit verification code.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const data = await verifyEmailApi(verificationEmail, cleanCode);
+      if (data.success) {
+        setAuthUser(data.user, data.token);
+        setAuthSuccess('Email verified successfully! Welcome to Evalix 2.0.');
+        setTimeout(() => {
+          closeAuth();
+          navigate('/upload');
+        }, 500);
+      } else {
+        setAuthError(data.message || 'Verification failed. Please try again.');
+      }
+    } catch (error) {
+      const serverMsg = error.response?.data?.message || 'Failed to verify code. Please check and try again.';
       setAuthError(serverMsg);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Resend verification email
+  const handleResendCode = async () => {
+    if (resendCooldown > 0) return;
+    setAuthError('');
+    setAuthSuccess('');
+    try {
+      const data = await resendVerificationApi(verificationEmail);
+      if (data.success) {
+        setAuthSuccess('A new 6-digit verification code has been dispatched.');
+        if (data.devCode) setDevOtpHint(data.devCode);
+        setResendCooldown(30);
+      } else {
+        setAuthError(data.message || 'Could not resend code.');
+      }
+    } catch (error) {
+      const serverMsg = error.response?.data?.message || 'Failed to resend verification code.';
+      setAuthError(serverMsg);
     }
   };
 
@@ -195,8 +342,6 @@ const LandingPage = () => {
                 }
               </button>
 
-              {/* PLACEHOLDER: Trigger Login */}
-
               <button
                 type="button"
                 onClick={() => openAuth('login')}
@@ -204,8 +349,6 @@ const LandingPage = () => {
               >
                 Login
               </button>
-
-              {/* PLACEHOLDER: Trigger Sign Up */}
 
               <button
                 type="button"
@@ -746,7 +889,7 @@ const LandingPage = () => {
       </footer>
 
       {/* ===================================================================== */}
-      {/* 4. AUTH MODAL                                                        */}
+      {/* 4. AUTH MODAL (Login / Signup / Email Verification)                  */}
       {/* ===================================================================== */}
 
       {authModal.isOpen && (
@@ -764,7 +907,7 @@ const LandingPage = () => {
           <div
             className="p-4 p-sm-5 rounded-4 position-relative"
             style={{
-              maxWidth: '440px',
+              maxWidth: '460px',
               width: '100%',
               backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
               border: isDarkMode
@@ -785,20 +928,24 @@ const LandingPage = () => {
               <LuX size={20} />
             </button>
 
-            {/* Modal Title */}
+            {/* Modal Header */}
 
             <div className="text-center mb-4">
 
               <h3 className="fw-bold mb-1">
-                {authModal.mode === 'signup'
-                  ? 'Create your Evalix 2.0 Account'
-                  : 'Welcome back to Evalix 2.0'}
+                {authModal.mode === 'verify'
+                  ? 'Verify Your Email'
+                  : authModal.mode === 'signup'
+                    ? 'Create Evalix Account'
+                    : 'Welcome to Evalix 2.0'}
               </h3>
 
               <p className="text-secondary text-sm mb-0">
-                {authModal.mode === 'signup'
-                  ? 'Start evaluating documents with precision AI'
-                  : 'Sign in to access your evaluations and reports'}
+                {authModal.mode === 'verify'
+                  ? `Enter the 6-digit confirmation code sent to ${verificationEmail}`
+                  : authModal.mode === 'signup'
+                    ? 'Start evaluating documents with precision AI'
+                    : 'Sign in to access your evaluations and reports'}
               </p>
 
             </div>
@@ -816,172 +963,306 @@ const LandingPage = () => {
               </div>
             )}
 
-            {/* Form */}
+            {/* =============================================================== */}
+            {/* EMAIL VERIFICATION STEP                                         */}
+            {/* =============================================================== */}
+            {authModal.mode === 'verify' ? (
+              <form onSubmit={handleVerifySubmit}>
 
-            <form onSubmit={handleAuthSubmit}>
-
-              {authModal.mode === 'signup' && (
-                <div className="mb-3">
-                  <label className="form-label text-xs fw-semibold">
-                    Full Name
+                <div className="mb-3 text-center">
+                  <label className="form-label text-xs fw-semibold mb-2">
+                    6-Digit Verification Code
                   </label>
+
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    autoFocus
+                    placeholder="••••••"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                    className={`form-control verification-code-input ${isDarkMode ? 'bg-dark text-white' : ''}`}
+                    style={{
+                      borderColor: isDarkMode ? '#334155' : '#cbd5e1'
+                    }}
+                  />
+                </div>
+
+                {/* Dev Mode OTP auto-fill chip if available */}
+                {devOtpHint && (
+                  <div className="text-center mb-3">
+                    <button
+                      type="button"
+                      className="dev-code-chip"
+                      onClick={() => setVerificationCode(devOtpHint)}
+                      title="Click to paste test code"
+                    >
+                      <LuKey size={13} />
+                      <span>Test Code: <strong>{devOtpHint}</strong> (Click to paste)</span>
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting || verificationCode.trim().length !== 6}
+                  className="btn-primary-gradient w-100 py-2.5 mb-3"
+                >
+                  <LuCheck size={18} />
+                  <span>{isSubmitting ? 'Verifying...' : 'Verify Email & Continue'}</span>
+                </button>
+
+                {/* Resend and Return options */}
+                <div className="d-flex align-items-center justify-content-between text-xs text-secondary pt-2 border-top" style={{ borderColor: isDarkMode ? '#1e293b' : '#f1f5f9' }}>
+                  <button
+                    type="button"
+                    disabled={resendCooldown > 0}
+                    onClick={handleResendCode}
+                    className="btn btn-link p-0 text-xs text-primary fw-semibold text-decoration-none"
+                  >
+                    {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend Code'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthError('');
+                      setAuthSuccess('');
+                      openAuth('login');
+                    }}
+                    className="btn btn-link p-0 text-xs text-secondary text-decoration-none"
+                  >
+                    Back to Login
+                  </button>
+                </div>
+
+              </form>
+            ) : (
+              /* =============================================================== */
+              /* LOGIN & SIGNUP FORMS WITH CAPTCHA                               */
+              /* =============================================================== */
+              <form onSubmit={handleAuthSubmit}>
+
+                {authModal.mode === 'signup' && (
+                  <div className="mb-3">
+                    <label className="form-label text-xs fw-semibold">
+                      Full Name
+                    </label>
+                    <div className="input-group">
+                      <span
+                        className="input-group-text bg-transparent border-end-0 text-secondary"
+                        style={{
+                          borderColor: isDarkMode ? '#334155' : '#cbd5e1'
+                        }}
+                      >
+                        <LuUser size={16} />
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Dr. Jane Smith"
+                        className={`form-control border-start-0 ${isDarkMode ? 'bg-dark text-white' : ''}`}
+                        style={{
+                          borderColor: isDarkMode ? '#334155' : '#cbd5e1'
+                        }}
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="mb-3">
+
+                  <label className="form-label text-xs fw-semibold">
+                    Email Address
+                  </label>
+
                   <div className="input-group">
+
                     <span
                       className="input-group-text bg-transparent border-end-0 text-secondary"
                       style={{
                         borderColor: isDarkMode ? '#334155' : '#cbd5e1'
                       }}
                     >
-                      <LuUser size={16} />
+                      <LuMail size={16} />
                     </span>
+
                     <input
-                      type="text"
+                      type="email"
                       required
-                      placeholder="e.g. Dr. Jane Smith"
+                      placeholder="you@institution.edu"
                       className={`form-control border-start-0 ${isDarkMode ? 'bg-dark text-white' : ''}`}
                       style={{
                         borderColor: isDarkMode ? '#334155' : '#cbd5e1'
                       }}
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                     />
+
                   </div>
+
                 </div>
-              )}
 
-              <div className="mb-3">
+                <div className="mb-3">
 
-                <label className="form-label text-xs fw-semibold">
-                  Email Address
-                </label>
+                  <label className="form-label text-xs fw-semibold">
+                    Password
+                  </label>
 
-                <div className="input-group">
+                  <div className="input-group">
 
-                  <span
-                    className="input-group-text bg-transparent border-end-0 text-secondary"
-                    style={{
-                      borderColor: isDarkMode ? '#334155' : '#cbd5e1'
-                    }}
-                  >
-                    <LuMail size={16} />
-                  </span>
+                    <span
+                      className="input-group-text bg-transparent border-end-0 text-secondary"
+                      style={{
+                        borderColor: isDarkMode ? '#334155' : '#cbd5e1'
+                      }}
+                    >
+                      <LuLock size={16} />
+                    </span>
+
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      placeholder="Min. 6 characters"
+                      className={`form-control border-start-0 ${isDarkMode ? 'bg-dark text-white' : ''}`}
+                      style={{
+                        borderColor: isDarkMode ? '#334155' : '#cbd5e1'
+                      }}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+
+                  </div>
+
+                </div>
+
+                {/* VISUAL CAPTCHA SECTION */}
+                <div className="captcha-wrapper">
+                  <div className="d-flex align-items-center justify-content-between mb-1.5">
+                    <label className="form-label text-xs fw-semibold mb-0 d-flex align-items-center gap-1.5">
+                      <LuShieldCheck size={14} color="#6366f1" />
+                      <span>Security Verification</span>
+                    </label>
+                    <span className="text-secondary text-xs" style={{ fontSize: '0.7rem' }}>
+                      Case-insensitive
+                    </span>
+                  </div>
+
+                  <div className="captcha-preview-row">
+                    <div className="captcha-svg-container">
+                      {captchaData?.svg ? (
+                        <div
+                          dangerouslySetInnerHTML={{ __html: captchaData.svg }}
+                        />
+                      ) : (
+                        <span className="text-xs text-secondary py-2">
+                          {captchaLoading ? 'Generating challenge...' : 'Loading CAPTCHA...'}
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={loadCaptcha}
+                      disabled={captchaLoading}
+                      title="Load a new CAPTCHA"
+                      className={`btn-captcha-refresh ${captchaLoading ? 'spinning' : ''}`}
+                      aria-label="Refresh CAPTCHA"
+                    >
+                      <LuRefreshCw size={18} />
+                    </button>
+                  </div>
 
                   <input
-                    type="email"
+                    type="text"
                     required
-                    placeholder="you@institution.edu"
-                    className={`form-control border-start-0 ${isDarkMode ? 'bg-dark text-white' : ''}`}
+                    maxLength={10}
+                    placeholder="Enter characters displayed above"
+                    className={`form-control text-center font-monospace fw-bold text-uppercase ${isDarkMode ? 'bg-dark text-white' : ''}`}
                     style={{
-                      borderColor: isDarkMode ? '#334155' : '#cbd5e1'
+                      borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+                      letterSpacing: '4px',
+                      fontSize: '0.95rem'
                     }}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value.toUpperCase())}
                   />
-
                 </div>
 
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !captchaInput.trim()}
+                  className="btn-primary-gradient w-100 py-2.5"
+                >
+                  {isSubmitting
+                    ? 'Please wait...'
+                    : authModal.mode === 'signup'
+                      ? 'Create Account'
+                      : 'Sign In'
+                  }
+                </button>
+
+              </form>
+            )}
+
+            {/* Mode switch for Login / Signup */}
+            {authModal.mode !== 'verify' && (
+              <div className="text-center mt-3">
+                {authModal.mode === 'login' ? (
+                  <p className="text-xs text-secondary mb-0">
+                    Don't have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthError('');
+                        setAuthSuccess('');
+                        openAuth('signup');
+                      }}
+                      className="btn btn-link p-0 text-xs text-primary fw-semibold text-decoration-none"
+                    >
+                      Sign Up
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-xs text-secondary mb-0">
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthError('');
+                        setAuthSuccess('');
+                        openAuth('login');
+                      }}
+                      className="btn btn-link p-0 text-xs text-primary fw-semibold text-decoration-none"
+                    >
+                      Sign In
+                    </button>
+                  </p>
+                )}
               </div>
+            )}
 
-              <div className="mb-4">
-
-                <label className="form-label text-xs fw-semibold">
-                  Password
-                </label>
-
-                <div className="input-group">
-
-                  <span
-                    className="input-group-text bg-transparent border-end-0 text-secondary"
-                    style={{
-                      borderColor: isDarkMode ? '#334155' : '#cbd5e1'
-                    }}
-                  >
-                    <LuLock size={16} />
-                  </span>
-
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    placeholder="Min. 6 characters"
-                    className={`form-control border-start-0 ${isDarkMode ? 'bg-dark text-white' : ''}`}
-                    style={{
-                      borderColor: isDarkMode ? '#334155' : '#cbd5e1'
-                    }}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-
-                </div>
-
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="btn-primary-gradient w-100 py-2.5"
+            {authModal.mode === 'login' && (
+              <div
+                className="mt-4 p-2.5 rounded-3 text-center"
+                style={{
+                  backgroundColor: isDarkMode
+                    ? 'rgba(30, 27, 75, 0.4)'
+                    : '#eef2ff',
+                  border: isDarkMode
+                    ? '1px solid rgba(99, 102, 241, 0.2)'
+                    : '1px solid #c7d2fe',
+                  fontSize: '0.75rem',
+                  color: isDarkMode ? '#a5b4fc' : '#4338ca'
+                }}
               >
-                {isSubmitting
-                  ? 'Please wait...'
-                  : authModal.mode === 'signup'
-                    ? 'Create Account'
-                    : 'Sign In'
-                }
-              </button>
-
-            </form>
-
-            {/* Mode switch */}
-            <div className="text-center mt-3">
-              {authModal.mode === 'login' ? (
-                <p className="text-xs text-secondary mb-0">
-                  Don't have an account?{' '}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthError('');
-                      setAuthSuccess('');
-                      setAuthModal({ ...authModal, mode: 'signup' });
-                    }}
-                    className="btn btn-link p-0 text-xs text-primary fw-semibold text-decoration-none"
-                  >
-                    Sign Up
-                  </button>
-                </p>
-              ) : (
-                <p className="text-xs text-secondary mb-0">
-                  Already have an account?{' '}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthError('');
-                      setAuthSuccess('');
-                      setAuthModal({ ...authModal, mode: 'login' });
-                    }}
-                    className="btn btn-link p-0 text-xs text-primary fw-semibold text-decoration-none"
-                  >
-                    Sign In
-                  </button>
-                </p>
-              )}
-            </div>
-
-            <div
-              className="mt-4 p-2.5 rounded-3 text-center"
-              style={{
-                backgroundColor: isDarkMode
-                  ? 'rgba(30, 27, 75, 0.4)'
-                  : '#eef2ff',
-                border: isDarkMode
-                  ? '1px solid rgba(99, 102, 241, 0.2)'
-                  : '1px solid #c7d2fe',
-                fontSize: '0.75rem',
-                color: isDarkMode ? '#a5b4fc' : '#4338ca'
-              }}
-            >
-              💡 <strong>Demo Login:</strong> demo@evalix.com / EvalixDemo123 (or register any new email).
-            </div>
-
+                💡 <strong>Demo Login:</strong> demo@evalix.com / EvalixDemo123 (or register any new email).
+              </div>
+            )}
 
           </div>
 

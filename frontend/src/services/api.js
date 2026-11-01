@@ -20,15 +20,41 @@ api.interceptors.request.use((config) => {
 }, (error) => Promise.reject(error));
 
 /**
- * Authentication API calls
+ * Authentication API calls with CAPTCHA and Email Verification
  */
-export const loginUser = async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
+export const fetchCaptchaApi = async () => {
+    const response = await api.get('/auth/captcha');
     return response.data;
 };
 
-export const signupUser = async (email, password, name) => {
-    const response = await api.post('/auth/signup', { email, password, name });
+export const loginUser = async (email, password, captchaId, captchaInput) => {
+    const response = await api.post('/auth/login', { 
+        email, 
+        password, 
+        captchaId, 
+        captchaInput 
+    });
+    return response.data;
+};
+
+export const signupUser = async (email, password, name, captchaId, captchaInput) => {
+    const response = await api.post('/auth/signup', { 
+        email, 
+        password, 
+        name, 
+        captchaId, 
+        captchaInput 
+    });
+    return response.data;
+};
+
+export const verifyEmailApi = async (email, code) => {
+    const response = await api.post('/auth/verify-email', { email, code });
+    return response.data;
+};
+
+export const resendVerificationApi = async (email) => {
+    const response = await api.post('/auth/resend-verification', { email });
     return response.data;
 };
 
@@ -242,92 +268,6 @@ export const fetchCertificatesHistoryApi = async () => {
         return response.data;
     } catch (error) {
         console.error('Error fetching certificates history:', error);
-        throw error;
-    }
-};
-
-/**
- * Feedback APIs
- */
-export const submitFeedbackApi = async (feedbackData) => {
-    try {
-        const response = await api.post('/feedback', feedbackData);
-        return response.data;
-    } catch (error) {
-        console.error('Error submitting feedback:', error);
-        throw error;
-    }
-};
-
-export const fetchAllFeedbackApi = async () => {
-    try {
-        const response = await api.get('/feedback');
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching feedback:', error);
-        throw error;
-    }
-};
-
-export const updateFeedbackStatusApi = async (id, status) => {
-    try {
-        const response = await api.patch(`/feedback/${id}/status`, { status });
-        return response.data;
-    } catch (error) {
-        console.error('Error updating feedback status:', error);
-        throw error;
-    }
-};
-
-export const deleteFeedbackApi = async (id) => {
-    try {
-        const response = await api.delete(`/feedback/${id}`);
-        return response.data;
-    } catch (error) {
-        console.error('Error deleting feedback:', error);
-        throw error;
-    }
-};
-
-/**
- * Admin APIs
- */
-export const fetchAdminUsersApi = async () => {
-    try {
-        const response = await api.get('/admin/users');
-        return response.data;
-    } catch (error) {
-        console.error('Error fetching users:', error);
-        throw error;
-    }
-};
-
-export const updateUserRoleApi = async (userId, systemRole) => {
-    try {
-        const response = await api.patch(`/admin/users/${userId}/role`, { systemRole });
-        return response.data;
-    } catch (error) {
-        console.error('Error updating user role:', error);
-        throw error;
-    }
-};
-
-export const deleteUserApi = async (userId) => {
-    try {
-        const response = await api.delete(`/admin/users/${userId}`);
-        return response.data;
-    } catch (error) {
-        console.error('Error deleting user:', error);
-        throw error;
-    }
-};
-
-export const promoteWithSecretApi = async (secretKey) => {
-    try {
-        const response = await api.post('/admin/promote-with-secret', { secretKey });
-        return response.data;
-    } catch (error) {
-        console.error('Error promoting with secret key:', error);
         throw error;
     }
 };

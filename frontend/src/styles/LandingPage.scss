@@ -209,6 +209,95 @@
     backdrop-filter: blur(8px);
   }
 
+  // CAPTCHA and Verification UI
+  .captcha-wrapper {
+    background-color: rgba(241, 245, 249, 0.6);
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    transition: all 0.2s ease;
+
+    .captcha-preview-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .captcha-svg-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      min-height: 52px;
+
+      svg {
+        width: 100%;
+        max-width: 180px;
+        height: auto;
+        display: block;
+      }
+    }
+
+    .btn-captcha-refresh {
+      background: transparent;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #f1f5f9;
+        color: #4f46e5;
+        border-color: #a5b4fc;
+      }
+
+      &.spinning svg {
+        animation: spin 0.6s linear infinite;
+      }
+    }
+  }
+
+  .verification-code-input {
+    letter-spacing: 10px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    font-family: monospace;
+    padding: 10px 14px;
+    border-radius: 10px;
+  }
+
+  .dev-code-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background-color: rgba(99, 102, 241, 0.12);
+    border: 1px dashed rgba(99, 102, 241, 0.4);
+    color: #4f46e5;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: rgba(99, 102, 241, 0.2);
+    }
+  }
+
   // =========================================================================
   // DARK THEME OVERRIDES
   // Properly nested under &.dark so selectors compile accurately
@@ -282,10 +371,48 @@
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
       color: #f8fafc;
     }
+
+    .captcha-wrapper {
+      background-color: rgba(15, 23, 42, 0.6);
+      border-color: #334155;
+
+      .captcha-svg-container {
+        background: #0f172a;
+        border-color: #334155;
+      }
+
+      .btn-captcha-refresh {
+        border-color: #334155;
+        color: #94a3b8;
+
+        &:hover {
+          background: #1e293b;
+          color: #818cf8;
+          border-color: #6366f1;
+        }
+      }
+    }
+
+    .verification-code-input {
+      background-color: #0f172a;
+      border-color: #334155;
+      color: #a5b4fc;
+    }
+
+    .dev-code-chip {
+      background-color: rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.5);
+      color: #a5b4fc;
+    }
   }
 
   @keyframes floatBadge {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-8px); }
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 }
